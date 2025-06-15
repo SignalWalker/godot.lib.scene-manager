@@ -1,22 +1,129 @@
 class_name SceneTransitionManager extends RefCounted
 
-var old_transition_process_mode: Node.ProcessMode = Node.ProcessMode.PROCESS_MODE_INHERIT
+class SceneTransition extends RefCounted:
+	var trans: AnimationPlayer
+
+	enum TransitionStatus {
+		INACTIVE,
+		STARTED,
+		READY,
+		FINISHED
+	}
+
+	var status: TransitionStatus
+
+	signal started()
+	signal ready()
+	signal finished()
+
+	static func _is_start_animation(player: AnimationPlayer, name: StringName) -> bool:
+		return name == &"transition_start" || (player.autoplay != "" && name == player.autoplay)
+
+	func _has_animation(name: StringName) -> bool:
+		return self.trans.get_animation_list().find(name) >= 0
+
+	func _init(t: AnimationPlayer) -> void:
+		self.status = TransitionStatus.INACTIVE
+		self.trans = t
+		self.trans.animation_started.connect(self._on_animation_started)
+		self.trans.animation_finished.connect(self._on_animation_finished)
+		self.trans.tree_exiting.connect(self._on_animation_exiting)
+
+	func has_ready_step() -> bool:
+		return self._has_animation(&"transition_ready")
+
+	func has_end_step() -> bool:
+		return self._has_animation(&"transition_end")
+
+	func is_ready() -> bool:
+		return self.status == TransitionStatus.READY || self.status == TransitionStatus.FINISHED
+
+	func is_finished() -> bool:
+		return self.status == TransitionStatus.FINISHED
+
+	## Start the transition animation and return whether the transition is ready for scene swap
+	func start() -> bool:
+		print("starting scene transition...")
+		self.status = TransitionStatus.STARTED
+		self.trans.process_mode = Node.ProcessMode.PROCESS_MODE_ALWAYS
+		# check for autoplay and play that if it exists
+		if self.trans.autoplay != "":
+			self.trans.play(self.trans.autoplay)
+			self.started.emit()
+			return self.trans.autoplay == "transition_ready"
+		# otherwise, try playing "transition_start"
+		assert(self._has_animation(&"transition_start"), "[SceneManager] scene transition AnimationPlayer must have an autoplay animation or an animation named transition_start")
+		self.trans.play(&"transition_start")
+		self.started.emit()
+		return false
+
+	## Return once the transition is ready for scene swap
+	func wait_ready() -> void:
+		if self.is_ready():
+			return
+		await self.ready
+
+	## Return once the transition is finished
+	func wait_finished() -> void:
+		if self.is_finished():
+			return
+		await self.finished
+
+	func _make_ready() -> void:
+		print("\t-- making scene transition ready")
+		self.status = TransitionStatus.READY
+		self.ready.emit()
+
+	func _make_finished() -> void:
+		if self.status == TransitionStatus.STARTED:
+			self._make_ready()
+		print("\t-- making scene transition finished")
+		self.status = TransitionStatus.FINISHED
+		self.finished.emit()
+
+	func finish() -> void:
+		print("finishing scene transition")
+		await self.wait_ready()
+		if self.has_end_step():
+			self.trans.play(&"transition_end")
+			await self.wait_finished()
+		else:
+			self._make_finished()
+
+	func _on_animation_started(name: StringName) -> void:
+		print("scene transition animation started: ", name)
+		if name == &"transition_ready":
+			self._make_ready()
+		elif name == &"transition_end" && self.status == TransitionStatus.STARTED:
+			self._make_ready()
+
+	func _on_animation_finished(name: StringName) -> void:
+		print("scene transition animation finished: ", name)
+		if _is_start_animation(self.trans, name):
+			if self.has_ready_step():
+				print("\t-- playing ready step...")
+				self.trans.play(&"transition_ready")
+			elif self.has_end_step():
+				print("\t-- playing end step...")
+				self.trans.play(&"transition_end")
+			else:
+				print("\t-- finished...")
+				self._make_finished()
+		elif name == &"transition_ready":
+			if self.has_end_step():
+				self.trans.play(&"transition_end")
+			else:
+				self._make_finished()
+		elif name == &"transition_end":
+			self._make_finished()
+
+	func _on_animation_exiting() -> void:
+		self._make_finished()
+
 var old_tree_pause_state: bool = false
 var old_parent_process_mode: Node.ProcessMode = Node.ProcessMode.PROCESS_MODE_INHERIT
 
-var current_transition: Node = null:
-	get:
-		return current_transition
-	set(value):
-		if current_transition != null:
-			current_transition.process_mode = self.old_transition_process_mode
-			if current_transition.tree_exiting.is_connected(self._on_transition_exiting):
-				current_transition.tree_exiting.disconnect(self._on_transition_exiting)
-		current_transition = value
-		if current_transition != null:
-			self.old_transition_process_mode = current_transition.process_mode
-			current_transition.process_mode = Node.PROCESS_MODE_ALWAYS
-			current_transition.tree_exiting.connect(self._on_transition_exiting)
+var current_transition: SceneTransition = null
 
 func _init() -> void:
 	pass
@@ -24,13 +131,21 @@ func _init() -> void:
 func is_transitioning() -> bool:
 	return self.current_transition != null
 
-func apply_transition(parent: Node, transition: Node, pause_parent: bool = true) -> void:
+func _start_transition_animation() -> void:
+	pass
+
+func apply_transition(parent: Node, transition: AnimationMixer, pause_parent: bool = true) -> void:
 	assert(parent != null, "transition parent must not be null")
 	assert(transition != null, "transition must not be null")
 	assert(!self.is_transitioning(), "SceneTransitionManager is already running a scene transition")
+
 	if transition == null:
 		return
-	self.current_transition = transition
+
+	print("applying transition")
+
+	self.current_transition = SceneTransition.new(transition)
+	self.current_transition.start()
 
 	self.old_parent_process_mode = parent.process_mode
 	if pause_parent:
@@ -42,12 +157,9 @@ func apply_transition(parent: Node, transition: Node, pause_parent: bool = true)
 		if pause_parent:
 			tree.paused = true
 
-	parent.add_child(self.current_transition, false, Node.INTERNAL_MODE_BACK)
+	parent.add_child(self.current_transition.trans, false, Node.INTERNAL_MODE_BACK)
 
-func _cleanup_transition(parent: Node, transition: Node) -> void:
-	if transition != null && is_instance_valid(transition) && transition.is_inside_tree():
-		await transition.tree_exited
-
+func _cleanup_transition(parent: Node) -> void:
 	if parent != null:
 		parent.process_mode = self.old_parent_process_mode
 		if parent.is_inside_tree():
@@ -55,46 +167,31 @@ func _cleanup_transition(parent: Node, transition: Node) -> void:
 			tree.paused = self.old_tree_pause_state
 
 func end_transition() -> void:
-	var transition: Node = self.current_transition
+	print("ending transition")
+	var transition: SceneTransition = self.current_transition
 	self.current_transition = null
 	if transition == null:
 		return
 
-	var parent: Node = transition.get_parent()
+	var parent: Node = transition.trans.get_parent()
 
-	if transition.has_method(&"end_transition"):
-		var e_sig: Variant = transition.call(&"end_transition")
-		if e_sig is Signal:
-			await e_sig
-			transition.queue_free()
+	if transition.is_finished():
+		transition.trans.free()
 	else:
-		transition.free()
-		transition = null
+		await transition.finish()
+		transition.trans.queue_free()
 
-	await self._cleanup_transition(parent, transition)
+	self._cleanup_transition(parent)
 
 func _reparent_transition(p: Node, preserve_global_transform: bool) -> void:
 	if self.current_transition != null:
-		self.current_transition.reparent(p, preserve_global_transform)
-
-func _on_transition_exiting() -> void:
-	var transition: Node = self.current_transition
-	self.current_transition = null
-	var parent: Node = transition.get_parent()
-	self._cleanup_transition(parent, transition)
+		self.current_transition.trans.reparent(p, preserve_global_transform)
 
 ## Whether the transition is ready for the old scene to be freed from beneath it
 func is_transition_ready() -> bool:
 	assert(self.current_transition != null, "tried to check readiness of inactive transition")
-	var is_ready: Variant = self.current_transition.get(&"transition_is_ready")
-	if is_ready == null:
-		# if we can't find a `transition_is_ready` property, assume it's ready immediately
-		return true
-	return (is_ready is bool && is_ready) || (is_ready is Callable && (is_ready as Callable).call())
+	return self.current_transition.is_ready()
 
 ## Awaitable function that returns when the transition is ready for the old scene to be freed
-func transition_ready() -> void:
-	if self.is_transition_ready():
-		return
-	if self.current_transition.has_signal(&"transition_ready"):
-		await self.current_transition.get(&"transition_ready")
+func wait_ready() -> void:
+	await self.current_transition.wait_ready()

@@ -69,14 +69,14 @@ func is_busy() -> bool:
 ## - The current base scene
 func topmost_scene() -> Node:
 	if self.transition_manager.is_transitioning():
-		return self.transition_manager.current_transition
+		return self.transition_manager.current_transition.trans
 	elif self.overlays.top != null:
 		return self.overlays.top.node
 	else:
 		return self.current_scene
 
 ## Swap to a new scene without clearing overlays.
-func swap_scene(target: Variant, transition: Node = null, defer: bool = true) -> void:
+func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
 	assert(!self.is_changing_scene(), "[SceneManager] swap_scene() called during scene change")
 
 	var t: Variant = self._load_scene(target, true)
@@ -92,7 +92,7 @@ func swap_scene(target: Variant, transition: Node = null, defer: bool = true) ->
 		self._swap_scene(t, transition)
 
 ## Clear overlays and swap to a new scene.
-func change_scene(target: Variant, transition: Node = null, defer: bool = true) -> void:
+func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
 	assert(!self.is_changing_scene(), "[SceneManager] change_scene() called during scene change")
 
 	var t: Variant = self._load_scene(target, true)
@@ -108,10 +108,10 @@ func change_scene(target: Variant, transition: Node = null, defer: bool = true) 
 		self._change_scene(t, transition)
 
 ## Pause the current scene in favor of some sub-scene, and return an Overlay object that can be used to keep track of the status of the overlay
-func push_overlay(ovl: Variant, transition: Node = null, pause_below: bool = true, defer: bool = true, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_REUSE) -> Overlay:
+func push_overlay(ovl: Variant, transition: AnimationPlayer = null, pause_below: bool = true, defer: bool = true, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_REUSE) -> Overlay:
 	return self.overlays.push_overlay(self, ovl, transition, pause_below, defer, cache_mode)
 
-func _swap_scene(target: Variant, transition: Node) -> void:
+func _swap_scene(target: Variant, transition: AnimationPlayer) -> void:
 	# Whether we'll need to defer the call to _swap_scene_resolved. It's assumed that we enter this function
 	# while it's safe to directly modify the tree, but any awaits will force us to defer til the next time it's safe.
 	var must_defer: bool = false
@@ -120,16 +120,19 @@ func _swap_scene(target: Variant, transition: Node) -> void:
 
 	if transition != null:
 		# start the scene transition
+		print("_swap_scene: applying transition...")
 		self.transition_manager.apply_transition(self.root, transition)
 		# swap the old scene out
 		self.current_scene = null
 		if self.transition_manager.is_transition_ready():
+			print("_swap_scene: transition is already ready")
 			# transition is already ready for the old scene to be swapped out
 			# we never awaited, so we're still safe to directly free the old scene
 			old_scene.free()
 		else:
+			print("_swap_scene: awaiting transition ready")
 			# wait til the transition is ready for the old scene to be swapped out
-			await self.transition_manager.transition_ready()
+			await self.transition_manager.wait_ready()
 			# we awaited, so we'll have to defer the next step now...
 			must_defer = true
 			# queue freeing the old scene (we awaited, so it's not safe now to directly free it)
@@ -172,7 +175,7 @@ func _swap_scene_resolved(old_scene: Node, new_scene: Node) -> void:
 	# emit scene change signal
 	self.scene_changed.emit(current_scene)
 
-func _change_scene(target: Variant, transition: Node) -> void:
+func _change_scene(target: Variant, transition: AnimationPlayer) -> void:
 	# clear overlays
 	self.overlays.clear()
 	# swap scene

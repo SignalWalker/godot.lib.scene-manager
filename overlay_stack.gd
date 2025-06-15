@@ -77,7 +77,7 @@ func _push_overlay(manager: SSceneManager, overlay: Overlay, transition: Node = 
 	self.top = overlay
 
 	if transition != null:
-		await manager.transition_manager.transition_ready()
+		await manager.transition_manager.wait_ready()
 		self._push_overlay_deferred.call_deferred(manager, overlay)
 	else:
 		self._push_overlay_deferred(manager, overlay)
