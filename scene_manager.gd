@@ -18,7 +18,7 @@ var current_scene: Node = null:
 			if current_scene.get_parent() == null:
 				self.root.add_child(current_scene)
 			elif !self.root.is_ancestor_of(current_scene):
-				printerr("[SceneManager] set SceneManager.current_scene to scene that is not descendant of SceneManager.root; reparenting...")
+				push_error("set SceneManager.current_scene to scene that is not descendant of SceneManager.root; reparenting...")
 				current_scene.reparent(self.root, false)
 		self._update_tree_current_scene()
 
@@ -55,7 +55,7 @@ func _update_tree_current_scene() -> void:
 		if p == tree.root:
 			self.get_tree().current_scene = topmost
 	else:
-		printerr("[SceneManager] could not update tree.current_scene: no transition, no overlay, and SceneManager.current_scene is null")
+		push_error("could not update tree.current_scene: no transition, no overlay, and SceneManager.current_scene is null")
 
 func is_changing_scene() -> bool:
 	return self.overlays.is_busy() || self.swapping_scenes
@@ -77,7 +77,7 @@ func topmost_scene() -> Node:
 
 ## Swap to a new scene without clearing overlays.
 func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
-	assert(!self.is_changing_scene(), "[SceneManager] swap_scene() called during scene change")
+	assert(!self.is_changing_scene(), "swap_scene() called during scene change")
 
 	var t: Variant = self._load_scene(target, true)
 	if t == null:
@@ -93,7 +93,7 @@ func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool
 
 ## Clear overlays and swap to a new scene.
 func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
-	assert(!self.is_changing_scene(), "[SceneManager] change_scene() called during scene change")
+	assert(!self.is_changing_scene(), "change_scene() called during scene change")
 
 	var t: Variant = self._load_scene(target, true)
 	if t == null:
@@ -120,17 +120,14 @@ func _swap_scene(target: Variant, transition: AnimationPlayer) -> void:
 
 	if transition != null:
 		# start the scene transition
-		print("_swap_scene: applying transition...")
 		self.transition_manager.apply_transition(self.root, transition)
 		# swap the old scene out
 		self.current_scene = null
 		if self.transition_manager.is_transition_ready():
-			print("_swap_scene: transition is already ready")
 			# transition is already ready for the old scene to be swapped out
 			# we never awaited, so we're still safe to directly free the old scene
 			old_scene.free()
 		else:
-			print("_swap_scene: awaiting transition ready")
 			# wait til the transition is ready for the old scene to be swapped out
 			await self.transition_manager.wait_ready()
 			# we awaited, so we'll have to defer the next step now...
@@ -190,13 +187,13 @@ func _load_scene_threaded(path: String, cache_mode: ResourceLoader.CacheMode) ->
 ## Returns either a Node, a ThreadPool.TaskResult returning a Node, or null on failure.
 func _load_scene(scene: Variant, threaded: bool = false, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_IGNORE) -> Variant:
 	if scene == null:
-		printerr("could not load scene: null parameter")
+		push_error("could not load scene: null parameter")
 		return null
 	# load from path...
 	if scene is String or scene is StringName:
 		var path: String = scene as String
 		if not ResourceLoader.exists(path, "PackedScene"):
-			printerr("could not load scene: PackedScene not found at given path: ", path)
+			push_error("could not load scene: PackedScene not found at given path: ", path)
 			return null
 		if threaded:
 			return self._load_scene_threaded(path, cache_mode)
@@ -206,12 +203,12 @@ func _load_scene(scene: Variant, threaded: bool = false, cache_mode: ResourceLoa
 	if scene is PackedScene:
 		var ts: PackedScene = scene as PackedScene
 		if !ts.can_instantiate():
-			printerr("could not load scene: can't instantiate ", ts)
+			push_error("could not load scene: can't instantiate ", ts)
 			return null
 		scene = ts.instantiate()
 	# return the scene root node
 	if scene is Node:
 		return scene
 	else:
-		printerr("could not load scene: not a Node: ", scene)
+		push_error("could not load scene: not a Node: ", scene)
 		return null

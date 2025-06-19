@@ -43,7 +43,6 @@ class SceneTransition extends RefCounted:
 
 	## Start the transition animation and return whether the transition is ready for scene swap
 	func start() -> bool:
-		print("starting scene transition...")
 		self.status = TransitionStatus.STARTED
 		self.trans.process_mode = Node.ProcessMode.PROCESS_MODE_ALWAYS
 		# check for autoplay and play that if it exists
@@ -70,19 +69,16 @@ class SceneTransition extends RefCounted:
 		await self.finished
 
 	func _make_ready() -> void:
-		print("\t-- making scene transition ready")
 		self.status = TransitionStatus.READY
 		self.ready.emit()
 
 	func _make_finished() -> void:
 		if self.status == TransitionStatus.STARTED:
 			self._make_ready()
-		print("\t-- making scene transition finished")
 		self.status = TransitionStatus.FINISHED
 		self.finished.emit()
 
 	func finish() -> void:
-		print("finishing scene transition")
 		await self.wait_ready()
 		if self.has_end_step():
 			self.trans.play(&"transition_end")
@@ -91,23 +87,18 @@ class SceneTransition extends RefCounted:
 			self._make_finished()
 
 	func _on_animation_started(name: StringName) -> void:
-		print("scene transition animation started: ", name)
 		if name == &"transition_ready":
 			self._make_ready()
 		elif name == &"transition_end" && self.status == TransitionStatus.STARTED:
 			self._make_ready()
 
 	func _on_animation_finished(name: StringName) -> void:
-		print("scene transition animation finished: ", name)
 		if _is_start_animation(self.trans, name):
 			if self.has_ready_step():
-				print("\t-- playing ready step...")
 				self.trans.play(&"transition_ready")
 			elif self.has_end_step():
-				print("\t-- playing end step...")
 				self.trans.play(&"transition_end")
 			else:
-				print("\t-- finished...")
 				self._make_finished()
 		elif name == &"transition_ready":
 			if self.has_end_step():
@@ -142,8 +133,6 @@ func apply_transition(parent: Node, transition: AnimationMixer, pause_parent: bo
 	if transition == null:
 		return
 
-	print("applying transition")
-
 	self.current_transition = SceneTransition.new(transition)
 	self.current_transition.start()
 
@@ -167,7 +156,6 @@ func _cleanup_transition(parent: Node) -> void:
 			tree.paused = self.old_tree_pause_state
 
 func end_transition() -> void:
-	print("ending transition")
 	var transition: SceneTransition = self.current_transition
 	self.current_transition = null
 	if transition == null:

@@ -13,7 +13,14 @@ var stack: WeakRef = null:
 		stack = value
 
 var below: Overlay
-var above: WeakRef
+var above_ref: WeakRef
+var above: Overlay:
+	get:
+		if self.above_ref == null:
+			return null
+		return self.above_ref.get_ref() as Overlay
+	set(value):
+		self.above_ref = weakref(value)
 
 var b_node: Node
 var pause_below: bool
@@ -56,7 +63,7 @@ func _finish() -> void:
 	assert(self.status == OverlayStatus.ACTIVE, "tried to finish inactive/previously-finished overlay")
 	self.status = OverlayStatus.FINISHED
 
-	var a: Overlay = self.above.get_ref() as Overlay
+	var a: Overlay = self.above
 	if a != null:
 		# connect the overlay/node below this one to the above overlay
 		a._reconnect(self.below, self.b_node, self.below_process_mode)
@@ -111,7 +118,7 @@ func _reconnect(bel: Overlay, b: Node, b_mode: Node.ProcessMode) -> void:
 func _set_below(b: Overlay, b_mode: Node.ProcessMode) -> void:
 	self.below = b
 	if self.below != null:
-		self.below.above = weakref(self)
+		self.below.above = self
 		self._set_b_node(self.below.node, b_mode)
 		self._update_b_node()
 

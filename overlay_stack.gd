@@ -85,4 +85,3 @@ func _push_overlay(manager: SSceneManager, overlay: Overlay, transition: Node = 
 func _on_overlay_finishing(overlay: Overlay) -> void:
 	if self.top == overlay:
 		self.top = overlay.below
-		self.top_changed.emit(self.top)
