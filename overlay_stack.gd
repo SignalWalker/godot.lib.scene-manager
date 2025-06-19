@@ -17,13 +17,8 @@ func clear() -> void:
 func is_busy() -> bool:
 	return self.pushing_overlay
 
-## Get the index of the given node within the overlay stack
-func get_index_of(n: Node) -> int:
-	var id: int = n.get_instance_id()
-	return self.stack.find_custom(func(ovl: Overlay) -> bool: return ovl.node.get_instance_id() == id)
-
 ## Pause the current scene in favor of some sub-scene, and return an Overlay object that can be used to keep track of the status of the overlay
-func push_overlay(manager: SSceneManager, ovl: Variant, transition: Node, pause_below: bool, defer: bool, cache_mode: ResourceLoader.CacheMode) -> Overlay:
+func push_overlay(manager: SSceneManager, ovl: Variant, transition: AnimationMixer, pause_below: bool, defer: bool, cache_mode: ResourceLoader.CacheMode) -> Overlay:
 	assert(!self.is_busy(), "tried to push overlay while already pushing an overlay")
 	var node: Node = manager._load_scene(ovl, false, cache_mode)
 	if node == null:
@@ -41,10 +36,10 @@ func pop_overlay() -> Node:
 	if self.top == null:
 		return null
 
-	var top: Overlay = self.top
-	var parent: Node = top.get_parent()
+	var t: Overlay = self.top
+	var parent: Node = t.node.get_parent()
 	if parent != null:
-		parent.remove_child(top.node)
+		parent.remove_child(t.node)
 
 	return top.node
 
@@ -68,7 +63,7 @@ func _push_overlay_deferred(manager: SSceneManager, overlay: Overlay) -> void:
 	self.pushing_overlay = false
 	overlay._activate()
 
-func _push_overlay(manager: SSceneManager, overlay: Overlay, transition: Node = null) -> void:
+func _push_overlay(manager: SSceneManager, overlay: Overlay, transition: AnimationMixer = null) -> void:
 	assert(manager.current_scene != null, "[SceneManager] tried to push overlay while current scene is null (during scene change?)")
 
 	if transition != null:

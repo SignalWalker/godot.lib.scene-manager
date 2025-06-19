@@ -32,7 +32,7 @@ var status: OverlayStatus
 signal activated(is_active: bool)
 signal finished(n: Node)
 
-func _init(s: OverlayStack, pause_below: bool, base: Node, bel: Overlay, n: Node) -> void:
+func _init(s: OverlayStack, p_below: bool, base: Node, bel: Overlay, n: Node) -> void:
 
 	self.stack = weakref(s)
 
@@ -42,7 +42,7 @@ func _init(s: OverlayStack, pause_below: bool, base: Node, bel: Overlay, n: Node
 	self.node.process_mode = Node.PROCESS_MODE_PAUSABLE
 	self.node.tree_exiting.connect(self._on_node_exiting)
 
-	self.pause_below = pause_below
+	self.pause_below = p_below
 
 	if bel == null:
 		self.below = null
