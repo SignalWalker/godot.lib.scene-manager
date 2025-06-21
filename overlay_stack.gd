@@ -1,6 +1,6 @@
 class_name OverlayStack extends RefCounted
 
-var top: Overlay
+var top: Overlay = null
 var pushing_overlay: bool
 
 func _init() -> void:
@@ -33,15 +33,15 @@ func push_overlay(manager: SSceneManager, ovl: Variant, transition: AnimationMix
 
 ## Pop the topmost overlay from the stack and remove it from the scene tree.
 func pop_overlay() -> Node:
-	if self.top == null:
+	var t := self.top
+	if t == null:
 		return null
 
-	var t: Overlay = self.top
-	var parent: Node = t.node.get_parent()
+	var parent := t.node.get_parent()
 	if parent != null:
 		parent.remove_child(t.node)
 
-	return top.node
+	return t.node
 
 func _reparent_all(p: Node, preserve_global_transform: bool) -> void:
 	var overlays: Array[Node] = []
