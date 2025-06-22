@@ -32,4 +32,4 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	if !Engine.is_editor_hint():
 		return
-	Engine.remove_meta("SceneManagerPlugin")
+	Engine.remove_meta(&"SceneManagerPlugin")
