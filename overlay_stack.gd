@@ -24,7 +24,7 @@ func push_overlay(manager: SSceneManager, ovl: Variant, transition: AnimationMix
 	if node == null:
 		return
 	self.pushing_overlay = true
-	var overlay: Overlay = Overlay.new(self, pause_below, manager.current_scene, self.top, node)
+	var overlay: Overlay = Overlay.new(self, pause_below, manager.get_current_scene(), self.top, node)
 	if defer:
 		self._push_overlay.call_deferred(manager, overlay, transition)
 	else:
@@ -54,8 +54,7 @@ func _reparent_all(p: Node, preserve_global_transform: bool) -> void:
 
 func _push_overlay_deferred(manager: SSceneManager, overlay: Overlay) -> void:
 	# update tree
-	manager.root.add_child(overlay.node)
-	manager._update_tree_current_scene()
+	manager.get_root().add_child(overlay.node)
 
 	await manager.transition_manager.end_transition()
 
@@ -64,10 +63,10 @@ func _push_overlay_deferred(manager: SSceneManager, overlay: Overlay) -> void:
 	overlay._activate()
 
 func _push_overlay(manager: SSceneManager, overlay: Overlay, transition: AnimationMixer = null) -> void:
-	assert(manager.current_scene != null, "[SceneManager] tried to push overlay while current scene is null (during scene change?)")
+	assert(manager.get_current_scene() != null, "[SceneManager] tried to push overlay while current scene is null (during scene change?)")
 
 	if transition != null:
-		manager.transition_manager.apply_transition(manager.root, transition)
+		manager.transition_manager.apply_transition(manager.get_root(), transition)
 
 	self.top = overlay
 

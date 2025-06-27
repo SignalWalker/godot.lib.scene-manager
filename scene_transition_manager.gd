@@ -125,7 +125,7 @@ func is_transitioning() -> bool:
 func _start_transition_animation() -> void:
 	pass
 
-func apply_transition(parent: Node, transition: AnimationMixer, pause_parent: bool = true) -> void:
+func apply_transition(parent: Node, transition: AnimationPlayer, pause_parent: bool = true) -> void:
 	assert(parent != null, "transition parent must not be null")
 	assert(transition != null, "transition must not be null")
 	assert(!self.is_transitioning(), "SceneTransitionManager is already running a scene transition")

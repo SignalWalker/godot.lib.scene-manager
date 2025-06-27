@@ -1,7 +1,15 @@
 @tool
 class_name SceneManagerSettings extends RefCounted
 
-static var DEFINITIONS: Dictionary = {
+const ROOT_SCENE: String = "runtime/root_scene"
+
+const DEFINITIONS: Dictionary = {
+	ROOT_SCENE: {
+		"value": "",
+		"type": TYPE_STRING_NAME,
+		"hint": PROPERTY_HINT_FILE,
+		"hint_string": "PackedScene"
+	}
 }
 
 static func prepare() -> void:
@@ -32,3 +40,6 @@ static func get_setting(path: StringName, default: Variant) -> Variant:
 		return setting
 	else:
 		return default
+
+static func has_setting(path: StringName) -> bool:
+	return ProjectSettings.has_setting("scene_manager/%s" % path)

@@ -1,26 +1,18 @@
 class_name SSceneManager extends Node
 
+const SMSettings := preload("./project_settings.gd")
+
 var scene_load_pool: ThreadPool = null
 
-var root: Viewport:
-	get:
-		return root
-	set(value):
-		root = value
-		self._reparent_to_root.call_deferred()
+var _root_scene_packed: PackedScene = null
 
-var current_scene: Node = null:
-	get:
-		return current_scene
-	set(value):
-		current_scene = value
-		if current_scene != null:
-			if current_scene.get_parent() == null:
-				self.root.add_child(current_scene)
-			elif !self.root.is_ancestor_of(current_scene):
-				push_error("set SceneManager.current_scene to scene that is not descendant of SceneManager.root; reparenting...")
-				current_scene.reparent(self.root, false)
-		self._update_tree_current_scene()
+## The root node of the scene containing the root node of the effective scene tree
+var _root_scene: Node = null
+
+## The root node of the scene tree (may be the same as _root_scene)
+var _root: Node = null
+
+var _current_scene: Node = null
 
 var swapping_scenes: bool = false
 
@@ -33,29 +25,95 @@ signal scene_changed(scene: Node)
 
 func _init() -> void:
 	self.scene_load_pool = ThreadPool.new(1)
+
 	self.overlays = OverlayStack.new()
 	self.transition_manager = SceneTransitionManager.new()
 
-func _ready() -> void:
-	var tree: SceneTree = self.get_tree()
-	self.root = tree.root
-	self.current_scene = tree.current_scene
 
-func _reparent_to_root() -> void:
-	if self.current_scene != null:
-		self.current_scene.reparent(root, false)
-	self.overlays._reparent_all(root, false)
-	self.transition_manager._reparent_transition(root, false)
+	if SMSettings.has_setting(SMSettings.ROOT_SCENE):
+		var root_scene_path := SMSettings.get_setting(SMSettings.ROOT_SCENE, null) as String
+		self._root_scene_packed = load(root_scene_path)
+		if self._root_scene_packed != null:
+			self._root_scene = self._root_scene_packed.instantiate()
 
-func _update_tree_current_scene() -> void:
-	var topmost: Node = self.topmost_scene()
-	if topmost != null:
+			if self._root_scene.has_method(&"get_scene_manager_root"):
+				self._root = self._root_scene.call(&"get_scene_manager_root")
+				if self._root == null:
+					push_error("SceneManager._root_scene.get_scene_manager_root() returned null")
+					self._root = self._root_scene
+			else:
+				self._root = self._root_scene
+		else:
+			push_error("could not load scene from path {0}".format([root_scene_path]))
+
+func _enter_tree() -> void:
+	# set the root scene if necessary
+	if self._root_scene == null:
 		var tree: SceneTree = self.get_tree()
-		var p: Node = topmost.get_parent()
-		if p == tree.root:
-			self.get_tree().current_scene = topmost
-	else:
-		push_error("could not update tree.current_scene: no transition, no overlay, and SceneManager.current_scene is null")
+		self._root_scene = tree.root
+		self._root = tree.root
+
+	assert(self._root_scene != null)
+	assert(self._root != null)
+
+func _ready() -> void:
+	# move whatever the engine decided was the current scene to our root
+	self._post_ready.call_deferred()
+
+func _post_ready() -> void:
+	print("post_ready")
+	var tree := self.get_tree()
+	var c := tree.current_scene
+	c.get_parent().remove_child(c)
+
+	tree.root.add_child(self._root_scene)
+	self._set_current_scene(c)
+
+func _set_current_scene(s: Node) -> Node:
+	print("_set_current_scene")
+	var old := self._current_scene
+
+	self._current_scene = s
+
+	if self._current_scene != null:
+		print("buh")
+		var p := self._current_scene.get_parent()
+		if p != null:
+			push_error("setting SceneManager._current_scene to one that already has a parent; reparenting...")
+			p.remove_child(self._current_scene)
+
+		if old == null:
+			self._root.add_child(self._current_scene)
+		else:
+			assert(old.get_parent() == self._root)
+			old.add_sibling(self._current_scene)
+
+	# if old != null:
+	# 	self._root.remove_child(old)
+
+	return old
+
+func get_current_scene() -> Node:
+	return self._current_scene
+
+func get_root() -> Node:
+	return self._root
+
+# func _reparent_to_root() -> void:
+# 	if self._current_scene != null:
+# 		self._current_scene.reparent(self._root, false)
+# 	self.overlays._reparent_all(self._root, false)
+# 	self.transition_manager._reparent_transition(self._root, false)
+
+# func _update_tree_current_scene() -> void:
+# 	var topmost: Node = self.topmost_scene()
+# 	if topmost != null:
+# 		var tree: SceneTree = self.get_tree()
+# 		var p: Node = topmost.get_parent()
+# 		if p == tree.root:
+# 			self.get_tree().current_scene = topmost
+# 	else:
+# 		push_error("could not update tree.current_scene: no transition, no overlay, and SceneManager.current_scene is null")
 
 func is_changing_scene() -> bool:
 	return self.overlays.is_busy() || self.swapping_scenes
@@ -73,7 +131,7 @@ func topmost_scene() -> Node:
 	elif self.overlays.top != null:
 		return self.overlays.top.node
 	else:
-		return self.current_scene
+		return self._current_scene
 
 ## Swap to a new scene without clearing overlays.
 func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
@@ -116,13 +174,13 @@ func _swap_scene(target: Variant, transition: AnimationPlayer) -> void:
 	# while it's safe to directly modify the tree, but any awaits will force us to defer til the next time it's safe.
 	var must_defer: bool = false
 
-	var old_scene: Node = self.current_scene
+	var old_scene: Node = self._current_scene
 
 	if transition != null:
 		# start the scene transition
-		self.transition_manager.apply_transition(self.root, transition)
+		self.transition_manager.apply_transition(self._root, transition)
 		# swap the old scene out
-		self.current_scene = null
+		self._set_current_scene(null)
 		if self.transition_manager.is_transition_ready():
 			# transition is already ready for the old scene to be swapped out
 			# we never awaited, so we're still safe to directly free the old scene
@@ -162,7 +220,7 @@ func _swap_scene_resolved(old_scene: Node, new_scene: Node) -> void:
 		old_scene.free()
 
 	# swap in the new scene
-	self.current_scene = new_scene
+	self._set_current_scene(new_scene)
 
 	# tell the transition to end, and wait for it to do so...
 	await self.transition_manager.end_transition()
@@ -170,7 +228,7 @@ func _swap_scene_resolved(old_scene: Node, new_scene: Node) -> void:
 	# allow scene to change
 	self.swapping_scenes = false
 	# emit scene change signal
-	self.scene_changed.emit(current_scene)
+	self.scene_changed.emit(self._current_scene)
 
 func _change_scene(target: Variant, transition: AnimationPlayer) -> void:
 	# clear overlays

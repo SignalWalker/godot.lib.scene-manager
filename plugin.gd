@@ -2,17 +2,17 @@
 extends EditorPlugin
 
 func get_plugin_path() -> String:
-	return get_script().resource_path.get_base_dir()
+	return (get_script() as Script).resource_path.get_base_dir()
 
-static func get_script_props_by_name(name: String) -> Dictionary:
+static func get_script_props_by_name(n: String) -> Dictionary:
 	for cls: Dictionary in ProjectSettings.get_global_class_list():
-		if cls["class"] == name:
+		if cls["class"] == n:
 			return cls
-	push_error("could not find type {0}".format([name]))
+	push_error("could not find type {0}".format([n]))
 	return {}
 
-static func script_exists(name: String) -> bool:
-	return !get_script_props_by_name(name).is_empty()
+static func script_exists(n: String) -> bool:
+	return !get_script_props_by_name(n).is_empty()
 
 func _enable_plugin() -> void:
 	if !script_exists("ThreadPool"):
