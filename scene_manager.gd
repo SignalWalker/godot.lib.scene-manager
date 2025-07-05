@@ -66,7 +66,9 @@ func _post_ready() -> void:
 	var c := tree.current_scene
 	c.get_parent().remove_child(c)
 
-	tree.root.add_child(self._root_scene)
+	if self._root_scene != tree.root:
+		tree.root.add_child(self._root_scene)
+
 	self._set_current_scene(c)
 
 func _set_current_scene(s: Node) -> Node:
