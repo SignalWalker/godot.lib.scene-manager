@@ -32,7 +32,10 @@ func _init() -> void:
 
 	if SMSettings.has_setting(SMSettings.ROOT_SCENE):
 		var root_scene_path := SMSettings.get_setting(SMSettings.ROOT_SCENE, null) as String
-		self._root_scene_packed = load(root_scene_path)
+
+		if root_scene_path != "":
+			self._root_scene_packed = load(root_scene_path)
+
 		if self._root_scene_packed != null:
 			self._root_scene = self._root_scene_packed.instantiate()
 
