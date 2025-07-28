@@ -139,7 +139,7 @@ func topmost_scene() -> Node:
 		return self._current_scene
 
 ## Swap to a new scene without clearing overlays.
-func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
+func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true, callback: Variant = null) -> void:
 	assert(!self.is_changing_scene(), "swap_scene() called during scene change")
 
 	var t: Variant = self._load_scene(target, true)
@@ -150,12 +150,12 @@ func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool
 	self.swapping_scenes = true
 
 	if defer:
-		self._swap_scene.call_deferred(t, transition)
+		self._swap_scene.call_deferred(t, transition, callback)
 	else:
-		self._swap_scene(t, transition)
+		self._swap_scene(t, transition, callback)
 
 ## Clear overlays and swap to a new scene.
-func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true) -> void:
+func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true, callback: Variant = null) -> void:
 	assert(!self.is_changing_scene(), "change_scene() called during scene change")
 
 	var t: Variant = self._load_scene(target, true)
@@ -166,15 +166,15 @@ func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bo
 	self.swapping_scenes = true
 
 	if defer:
-		self._change_scene.call_deferred(t, transition)
+		self._change_scene.call_deferred(t, transition, callback)
 	else:
-		self._change_scene(t, transition)
+		self._change_scene(t, transition, callback)
 
 ## Pause the current scene in favor of some sub-scene, and return an Overlay object that can be used to keep track of the status of the overlay
 func push_overlay(ovl: Variant, transition: AnimationPlayer = null, pause_below: bool = true, defer: bool = true, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_REUSE) -> Overlay:
 	return self.overlays.push_overlay(self, ovl, transition, pause_below, defer, cache_mode)
 
-func _swap_scene(target: Variant, transition: AnimationPlayer) -> void:
+func _swap_scene(target: Variant, transition: AnimationPlayer, callback: Variant) -> void:
 	# Whether we'll need to defer the call to _swap_scene_resolved. It's assumed that we enter this function
 	# while it's safe to directly modify the tree, but any awaits will force us to defer til the next time it's safe.
 	var must_defer: bool = false
@@ -213,12 +213,12 @@ func _swap_scene(target: Variant, transition: AnimationPlayer) -> void:
 
 	if must_defer:
 		# we awaited at some point above, so we'll need to defer this until it's safe again to directly modify the tree
-		self._swap_scene_resolved.call_deferred(old_scene, new_scene)
+		self._swap_scene_resolved.call_deferred(old_scene, new_scene, callback)
 	else:
 		# we never awaited above, so we can continue directly to the next step
-		self._swap_scene_resolved(old_scene, new_scene)
+		self._swap_scene_resolved(old_scene, new_scene, callback)
 
-func _swap_scene_resolved(old_scene: Node, new_scene: Node) -> void:
+func _swap_scene_resolved(old_scene: Node, new_scene: Node, callback: Variant) -> void:
 	if old_scene != null:
 		assert(is_instance_valid(old_scene), "old_scene has already been freed...?")
 		# didn't free the old scene in the previous step, so we'll free it now
@@ -235,11 +235,15 @@ func _swap_scene_resolved(old_scene: Node, new_scene: Node) -> void:
 	# emit scene change signal
 	self.scene_changed.emit(self._current_scene)
 
-func _change_scene(target: Variant, transition: AnimationPlayer) -> void:
+	if callback != null && callback is Callable:
+		var c := callback as Callable
+		c.call(self._current_scene)
+
+func _change_scene(target: Variant, transition: AnimationPlayer, callback: Variant) -> void:
 	# clear overlays
 	self.overlays.clear()
 	# swap scene
-	self._swap_scene(target, transition)
+	self._swap_scene(target, transition, callback)
 
 func _load_scene_threaded(path: String, cache_mode: ResourceLoader.CacheMode) -> ThreadPool.TaskResult:
 	ResourceLoader.load_threaded_request(path, "PackedScene", true, cache_mode)
