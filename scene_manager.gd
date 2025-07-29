@@ -142,7 +142,7 @@ func topmost_scene() -> Node:
 func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true, callback: Variant = null) -> void:
 	assert(!self.is_changing_scene(), "swap_scene() called during scene change")
 
-	var t: Variant = self._load_scene(target, true)
+	var t: Variant = self.load_scene(target, true)
 	if t == null:
 		# already printed errors
 		return
@@ -158,7 +158,7 @@ func swap_scene(target: Variant, transition: AnimationPlayer = null, defer: bool
 func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bool = true, callback: Variant = null) -> void:
 	assert(!self.is_changing_scene(), "change_scene() called during scene change")
 
-	var t: Variant = self._load_scene(target, true)
+	var t: Variant = self.load_scene(target, true)
 	if t == null:
 		# already printed errors
 		return
@@ -252,7 +252,7 @@ func _load_scene_threaded(path: String, cache_mode: ResourceLoader.CacheMode) ->
 	)
 
 ## Returns either a Node, a ThreadPool.TaskResult returning a Node, or null on failure.
-func _load_scene(scene: Variant, threaded: bool = false, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_IGNORE) -> Variant:
+func load_scene(scene: Variant, threaded: bool = false, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_IGNORE) -> Variant:
 	if scene == null:
 		push_error("could not load scene: null parameter")
 		return null

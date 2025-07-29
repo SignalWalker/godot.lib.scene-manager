@@ -20,7 +20,7 @@ func is_busy() -> bool:
 ## Pause the current scene in favor of some sub-scene, and return an Overlay object that can be used to keep track of the status of the overlay
 func push_overlay(manager: SSceneManager, ovl: Variant, transition: AnimationPlayer, pause_below: bool, defer: bool, cache_mode: ResourceLoader.CacheMode) -> Overlay:
 	assert(!self.is_busy(), "tried to push overlay while already pushing an overlay")
-	var node: Node = manager._load_scene(ovl, false, cache_mode)
+	var node: Node = manager.load_scene(ovl, false, cache_mode)
 	if node == null:
 		return
 	self.pushing_overlay = true
