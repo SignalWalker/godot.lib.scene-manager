@@ -174,6 +174,20 @@ func change_scene(target: Variant, transition: AnimationPlayer = null, defer: bo
 func push_overlay(ovl: Variant, transition: AnimationPlayer = null, pause_below: bool = true, defer: bool = true, cache_mode: ResourceLoader.CacheMode = ResourceLoader.CacheMode.CACHE_MODE_REUSE) -> Overlay:
 	return self.overlays.push_overlay(self, ovl, transition, pause_below, defer, cache_mode)
 
+## Play a transition animation and, optionally, do something during the transition.
+func play_transition(transition: AnimationPlayer, pause: bool = true, mid_transition_callback: Variant = null) -> void:
+	print("playing transition...")
+	self.transition_manager.apply_transition(self._root, transition, pause)
+
+	await self.transition_manager.wait_ready()
+	if mid_transition_callback != null:
+		print("\trunning mid-transition callback...")
+		assert(mid_transition_callback is Callable)
+		await (mid_transition_callback as Callable).call()
+
+	print("\tending transition...")
+	await self.transition_manager.end_transition()
+
 func _swap_scene(target: Variant, transition: AnimationPlayer, callback: Variant) -> void:
 	# Whether we'll need to defer the call to _swap_scene_resolved. It's assumed that we enter this function
 	# while it's safe to directly modify the tree, but any awaits will force us to defer til the next time it's safe.
