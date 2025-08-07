@@ -64,7 +64,6 @@ func _ready() -> void:
 	self._post_ready.call_deferred()
 
 func _post_ready() -> void:
-	print("post_ready")
 	var tree := self.get_tree()
 	var c := tree.current_scene
 	c.get_parent().remove_child(c)
@@ -75,13 +74,11 @@ func _post_ready() -> void:
 	self._set_current_scene(c)
 
 func _set_current_scene(s: Node) -> Node:
-	print("_set_current_scene")
 	var old := self._current_scene
 
 	self._current_scene = s
 
 	if self._current_scene != null:
-		print("buh")
 		var p := self._current_scene.get_parent()
 		if p != null:
 			push_error("setting SceneManager._current_scene to one that already has a parent; reparenting...")
@@ -176,16 +173,13 @@ func push_overlay(ovl: Variant, transition: AnimationPlayer = null, pause_below:
 
 ## Play a transition animation and, optionally, do something during the transition.
 func play_transition(transition: AnimationPlayer, pause: bool = true, mid_transition_callback: Variant = null) -> void:
-	print("playing transition...")
 	self.transition_manager.apply_transition(self._root, transition, pause)
 
 	await self.transition_manager.wait_ready()
 	if mid_transition_callback != null:
-		print("\trunning mid-transition callback...")
 		assert(mid_transition_callback is Callable)
 		await (mid_transition_callback as Callable).call()
 
-	print("\tending transition...")
 	await self.transition_manager.end_transition()
 
 func _swap_scene(target: Variant, transition: AnimationPlayer, callback: Variant) -> void:

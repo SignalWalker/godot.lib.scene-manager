@@ -138,7 +138,6 @@ func apply_transition(parent: Node, transition: AnimationPlayer, pause_parent: b
 
 	self.old_parent_process_mode = parent.process_mode
 	if pause_parent:
-		print("pausing transition parent...")
 		parent.process_mode = Node.PROCESS_MODE_DISABLED
 
 	if parent.is_inside_tree():
@@ -151,7 +150,6 @@ func apply_transition(parent: Node, transition: AnimationPlayer, pause_parent: b
 
 func _cleanup_transition(parent: Node) -> void:
 	if parent != null:
-		print("unpausing transition parent...")
 		parent.process_mode = self.old_parent_process_mode
 		if parent.is_inside_tree():
 			var tree: SceneTree = parent.get_tree()
